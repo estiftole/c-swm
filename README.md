@@ -1,1 +1,1 @@
-![c-swm simplified](images/c-swm simplified.png)
+![c-swm simplified](./images/c-swm simplified.png)
