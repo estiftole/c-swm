@@ -1,0 +1,12 @@
+# uv virtual environment (default location)
+.venv/
+.uv/
+
+# Python build and distribution artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+dist/
+*.egg-info/
