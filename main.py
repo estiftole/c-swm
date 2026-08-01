@@ -1,5 +1,5 @@
 def main():
-    print("Hello from c-swm!")
+    print("Hello from c-swm.")
 
 
 if __name__ == "__main__":
