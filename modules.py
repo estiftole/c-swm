@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch_geometric.utils import scatter
 from torch import nn
 import utils
 from typing import Optional, Tuple
