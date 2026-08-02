@@ -1,7 +1,9 @@
 import numpy as np
 import torch
+from torch_geometric.utils import scatter
 from torch import nn
 import utils
+from typing import Optional, Tuple
 
 class EncoderCNN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, num_slots: int, act_fn: str ="sigmoid", act_fn_hid: str ="relu") -> None:
@@ -47,13 +49,55 @@ class EncoderMLP(nn.Module):
 
     def forward(self, slot: torch.Tensor) -> torch.Tensor:
         h_flat = slot.view(-1, self.num_slots, self.input_dim)
-        h = self.fc1(h_flat)
-        h = self.act1(h)
 
-        h = self.fc2(h)
-        h = self.ln(h)
-        h = self.act2(h)
+        h = self.act1(self.fc1(h_flat))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
 
+        return h
+
+class EdgeModel(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int, act_fn: str = 'relu') -> None:
+        super(EdgeModel, self).__init__()
+
+        self.fc1 = nn.Linear(input_dim*2, hidden_dim)
+        self.act1 = utils.get_act_fn(act_fn)
+        self.fc2 =  nn.Linear(hidden_dim, hidden_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        h = torch.cat([source, target], dim=1)
+
+        h = self.act1(self.fc1(h))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        return h
+
+class NodeModel(nn.Module):
+    def __init__(self, node_input_dim: int, hidden_dim: int, out_dim: int, act_fn: str = 'relu'):
+        super(NodeModel, self).__init__()
+
+        self.fc1 = nn.Linear(node_input_dim, hidden_dim)
+        self.act1 = utils.get_act_fn(act_fn)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.fc3 = nn.Linear(hidden_dim, out_dim)
+
+    def forward(self, node_feat: torch.Tensor, edge_index: Optional[torch.Tensor], edge_feat: Optional[torch.Tensor]) -> torch.Tensor:
+        if edge_feat is not None:
+            row, _ = edge_index
+            # Aggregate messages passed to each node
+            agg = edge_feat.new_zeros(node_feat.size(0), edge_feat.size(1)).index_add_(0, row, edge_feat)
+            h = torch.cat([node_feat, agg], dim=1)
+        else:
+            h = node_feat
+
+        h = self.act1(self.fc1(h))
+        h = self.act2(self.ln(self.fc2(h)))
         h = self.fc3(h)
 
         return h
