@@ -6,7 +6,7 @@ from torch import nn
 
 class EncoderCNN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, num_slots: int, act_fn: str ="sigmoid", act_fn_hid: str ="relu") -> None:
-        super(Encoder, self).__init__()
+        super().__init__()
 
         self.cnn1 = nn.Conv2d(input_dim, hidden_dim, (3,3), padding=1)
         self.act1 = utils.get_act_fn(act_fn_hid)
@@ -33,7 +33,7 @@ class EncoderCNN(nn.Module):
 
 class EncoderMLP(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_slots: int, act_fn: str = 'relu', act_fn_hid: str = 'relu') -> None:
-        super(EncoderMLP, self).__init__()
+        super().__init__()
         self.num_slots = num_slots
         self.input_dim = input_dim
 
@@ -57,7 +57,7 @@ class EncoderMLP(nn.Module):
 
 class EdgeModel(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, act_fn: str = 'relu') -> None:
-        super(EdgeModel, self).__init__()
+        super().__init__()
 
         self.fc1 = nn.Linear(input_dim*2, hidden_dim)
         self.act1 = utils.get_act_fn(act_fn)
@@ -77,7 +77,7 @@ class EdgeModel(nn.Module):
 
 class NodeModel(nn.Module):
     def __init__(self, node_input_dim: int, hidden_dim: int, out_dim: int, act_fn: str = 'relu'):
-        super(NodeModel, self).__init__()
+        super().__init__()
 
         self.fc1 = nn.Linear(node_input_dim, hidden_dim)
         self.act1 = utils.get_act_fn(act_fn)
@@ -86,8 +86,8 @@ class NodeModel(nn.Module):
         self.act2 = utils.get_act_fn(act_fn)
         self.fc3 = nn.Linear(hidden_dim, out_dim)
 
-    def forward(self, node_feat: torch.Tensor, edge_index: Optional[torch.Tensor], edge_feat: Optional[torch.Tensor]) -> torch.Tensor:
-        if edge_feat is not None:
+    def forward(self, node_feat: torch.Tensor, edge_index: torch.Tensor|None, edge_feat: torch.Tensor|None) -> torch.Tensor:
+        if edge_feat is not None and edge_index is not None:
             row, _ = edge_index
             # Aggregate messages passed to each node
             agg = edge_feat.new_zeros(node_feat.size(0), edge_feat.size(1)).index_add_(0, row, edge_feat)
