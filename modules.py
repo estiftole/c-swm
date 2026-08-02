@@ -1,8 +1,8 @@
+from typing import Optional, Tuple
+import utils
 import numpy as np
 import torch
 from torch import nn
-import utils
-from typing import Optional, Tuple
 
 class EncoderCNN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, num_slots: int, act_fn: str ="sigmoid", act_fn_hid: str ="relu") -> None:
