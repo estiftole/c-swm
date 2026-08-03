@@ -1,4 +1,6 @@
+import torch
 from torch import nn
+import torch.nn.functional as F
 
 ACT_FNS = {
     'relu': nn.ReLU(),
@@ -13,3 +15,7 @@ def get_act_fn(act_fn):
         return ACT_FNS[act_fn]
     else:
         raise ValueError(f'Invalid argument for activation function "{act_fn}"')
+
+def to_one_hot(indices, max_index):
+    """Modern one-hot encoding using PyTorch built-ins."""
+    return F.one_hot(indices, num_classes=max_index).to(torch.float32)

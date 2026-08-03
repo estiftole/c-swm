@@ -1,4 +1,3 @@
-from typing import Optional, Tuple
 import utils
 import numpy as np
 import torch
@@ -100,3 +99,60 @@ class NodeModel(nn.Module):
         h = self.fc3(h)
 
         return h
+
+class TransitionModelGNN(nn.Module):
+    def __init__(self, node_input_dim: int, hidden_dim: int, out_dim: int, action_dim: int, act_fn: str = 'relu') -> None:
+        super(TransitionModelGNN, self).__init__()
+        self.action_dim = action_dim
+        self._node_fn = NodeModel(node_input_dim, hidden_dim, out_dim, act_fn)
+        self._edge_fn = EdgeModel(node_input_dim, hidden_dim, act_fn)
+
+        self.edge_list = None
+        self.batch_size = 0
+
+    def _get_edge_list_fully_connected(self, batch_size: int, num_slots: int, device: torch.device) -> torch.Tensor:
+        if self.edge_list is None or self.batch_size != batch_size:
+            self.batch_size = batch_size
+
+            nodes = torch.arange(num_slots)
+            senders, receivers = torch.meshgrid(nodes, nodes, indexing="ij")
+            mask = senders != receivers
+            base_senders = senders[mask]
+            base_receivers = receivers[mask]
+
+            batch_offsets = torch.arange(0, batch_size * num_slots, num_slots)
+            senders_batch = base_senders.unsqueeze(0) + batch_offsets.unsqueeze(1)
+            receivers_batch = base_receivers.unsqueeze(0) + batch_offsets.unsqueeze(1)
+
+            self.edge_list = torch.stack([
+                senders_batch.reshape(-1),
+                receivers_batch.reshape(-1)
+            ], dim=0)
+
+        return self.edge_list
+
+    def forward(self, states, action) -> torch.Tensor:
+        batch_size, num_nodes, _ = states.size
+
+        node_feat = states.view(-1, self.input_dim)
+
+        edge_feat = None
+        edge_index = None
+
+        if num_nodes > 1:
+            edge_index = self._get_edge_list_fully_connected(
+                batch_size, num_nodes, states.is_cuda)
+
+            row, col = edge_index
+            edge_feat = self._edge_fn( node_feat[row], node_feat[col], edge_feat)
+
+        action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
+        action_vec = action_vec.view(-1, self.action_dim)
+
+        # Attach action to each state
+        node_feat = torch.cat([node_feat, action_vec], dim=-1)
+
+        node_feat = self._node_fn(node_feat, edge_index, edge_feat)
+
+        # [batch_size, num_nodes, hidden_dim]
+        return node_feat.view(batch_size, num_nodes, -1)
