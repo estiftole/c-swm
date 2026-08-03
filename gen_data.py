@@ -16,12 +16,10 @@ if str(Path.cwd()) not in sys.path:
 import numpy as np
 from PIL import Image
 
-# Use modern gymnasium (or modern gym)
-import gymnasium as gym
-import ale_py  # <-- ADD THIS LINE! This registers ALE/Pong-v5, etc.
 
-# Uncomment if using custom C-SWM local environments (e.g. ShapesTrain-v0)
-# import envs
+import gymnasium as gym
+import ale_py
+
 import utils
 
 
@@ -67,20 +65,18 @@ if __name__ == '__main__':
         crop = (30, 200)
         warmstart = 50
     elif args.atari:
-        # Default fallback for other Atari games if not explicitly matched above
         crop = (0, 210)
         warmstart = 0
 
-    # Ensure warmstart is an integer if atari mode is enabled
     if args.atari:
         warmstart = warmstart if warmstart is not None else 0
 
-    # Pass max_episode_steps directly to gym.make if running atari mode
+
     kwargs = {}
     if args.atari and warmstart is not None:
         kwargs['max_episode_steps'] = warmstart + 11
 
-    # Create Environment
+
     env = gym.make(args.env_id, **kwargs)
 
     np.random.seed(args.seed)
@@ -102,13 +98,10 @@ if __name__ == '__main__':
             'next_obs': [],
         })
 
-        # Modern reset returns (observation, info)
-        # We pass episode-specific seed for reproducible rollouts
         ep_seed = args.seed + i
         ob, info = env.reset(seed=ep_seed)
 
         if args.atari:
-            # Burn-in steps
             for _ in range(warmstart):
                 action = agent.act(ob, reward, done)
                 # Modern step returns 5 values: ob, reward, terminated, truncated, info
@@ -136,7 +129,6 @@ if __name__ == '__main__':
                     break
         else:
             while True:
-                # Custom envs like ShapesTrain-v0 return ob as a tuple (state, image_array)
                 obs_frame = ob[1] if isinstance(ob, (tuple, list)) else ob
                 replay_buffer[i]['obs'].append(obs_frame)
 
@@ -156,7 +148,6 @@ if __name__ == '__main__':
 
     env.close()
 
-    # Save replay buffer to disk.
     utils.save_list_dict_h5py(replay_buffer, args.fname)
 # uv run gen_data.py --env_id ALE/Pong-v5 --fname data/pong_train.h5 --num_episodes 1000 --atari --seed 1
 # uv run gen_data.py --env_id ALE/Pong-v5 --fname data/pong_eval.h5 --num_episodes 100 --atari --seed 2

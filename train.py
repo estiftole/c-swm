@@ -13,12 +13,12 @@ import utils
 def main():
     parser = argparse.ArgumentParser(description="Train C-SWM World Model")
 
-    # Training Hyperparameters
+
     parser.add_argument('--batch-size', type=int, default=1024, help='Batch size.')
     parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs.')
     parser.add_argument('--learning-rate', type=float, default=5e-4, help='Learning rate.')
 
-    # Model Hyperparameters
+
     parser.add_argument('--encoder', type=str, default='small', help='Object extractor CNN size (e.g., `small`).')
     parser.add_argument('--sigma', type=float, default=0.5, help='Energy scale.')
     parser.add_argument('--hinge', type=float, default=1.0, help='Hinge threshold parameter.')
@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--ignore-action', action='store_true', default=False, help='Ignore action in GNN transition model.')
     parser.add_argument('--copy-action', action='store_true', default=False, help='Apply same action to all object slots.')
 
-    # Setup & Logging
+
     parser.add_argument('--no-cuda', action='store_true', default=False, help='Disable CUDA training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
     parser.add_argument('--log-interval', type=int, default=20, help='How many batches to wait before logging.')
@@ -39,16 +39,16 @@ def main():
 
     args = parser.parse_args()
 
-    # Device configuration
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device('cuda' if use_cuda else 'cpu')
 
-    # Seed initialization
+
     torch.manual_seed(args.seed)
     if use_cuda:
         torch.cuda.manual_seed(args.seed)
 
-    # Output Directory & Logging Setup
+
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     exp_name = timestamp if args.name == 'none' else args.name
     save_folder = os.path.join(args.save_folder, exp_name)
@@ -66,7 +66,7 @@ def main():
     logging.info(f"Using device: {device}")
     logging.info(f"Arguments: {vars(args)}")
 
-    # Dataset & DataLoader
+
     dataset = utils.StateTransitionsDataset(hdf5_file=args.dataset)
     train_loader = DataLoader(
         dataset,
@@ -77,11 +77,10 @@ def main():
     )
     logging.info(f"Loaded dataset")
 
-    # Infer input image spatial dimensions (C, H, W)
     sample_obs = next(iter(train_loader))[0]
     input_shape = sample_obs.shape[1:]
 
-    # Model Initialization
+
     model = models.ContrastiveSWM(
         embedding_dim=args.embedding_dim,
         hidden_dim=args.hidden_dim,
@@ -90,14 +89,14 @@ def main():
         num_slots=args.num_objects,
         sigma=args.sigma,
         hinge=args.hinge,
-        # encoder=args.encoder
+
     ).to(device)
 
     model.apply(utils.weights_init)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    # Training Loop
+
     logging.info('Starting C-SWM model training...')
     best_loss = float('inf')
     model_file = os.path.join(save_folder, 'model.pt')
@@ -107,12 +106,12 @@ def main():
         total_epoch_loss = 0.0
 
         for batch_idx, data_batch in enumerate(train_loader):
-            # Move batch tensors to target device: (obs, action, next_obs)
+
             data_batch = [tensor.to(device) for tensor in data_batch]
 
             optimizer.zero_grad()
 
-            # Forward pass: compute hinge contrastive loss
+
             loss = model.contrastive_loss(*data_batch)
             loss.backward()
             optimizer.step()
@@ -130,7 +129,7 @@ def main():
         avg_loss = total_epoch_loss / len(train_loader)
         logging.info(f"====> Epoch: {epoch:3d} | Average Loss: {avg_loss:.6f}")
 
-        # Save best model checkpoint
+
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), model_file)
