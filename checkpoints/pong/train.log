@@ -1,5 +1,0 @@
-2026-08-03 15:39:39,345 [INFO] Using device: cpu
-2026-08-03 15:39:39,369 [INFO] Arguments: {'batch_size': 1024, 'epochs': 200, 'learning_rate': 0.0005, 'encoder': 'medium', 'sigma': 0.5, 'hinge': 1.0, 'hidden_dim': 512, 'embedding_dim': 4, 'action_dim': 6, 'num_objects': 3, 'ignore_action': False, 'copy_action': True, 'no_cuda': False, 'seed': 42, 'log_interval': 20, 'dataset': 'data/pong_train.h5', 'name': 'pong', 'save_folder': 'checkpoints'}
-2026-08-03 15:46:33,569 [INFO] Using device: cpu
-2026-08-03 15:46:33,570 [INFO] Arguments: {'batch_size': 1024, 'epochs': 200, 'learning_rate': 0.0005, 'encoder': 'medium', 'sigma': 0.5, 'hinge': 1.0, 'hidden_dim': 512, 'embedding_dim': 4, 'action_dim': 6, 'num_objects': 3, 'ignore_action': False, 'copy_action': True, 'no_cuda': False, 'seed': 42, 'log_interval': 20, 'dataset': 'data/pong_train.h5', 'name': 'pong', 'save_folder': 'checkpoints'}
-2026-08-03 15:48:20,041 [INFO] Loaded dataset

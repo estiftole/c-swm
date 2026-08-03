@@ -2,7 +2,7 @@
 .venv/
 .uv/
 data/
-checkpoints/
+# checkpoints/
 
 # Python build and distribution artifacts
 __pycache__/
