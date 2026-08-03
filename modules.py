@@ -75,15 +75,15 @@ class EdgeModel(nn.Module):
         return h
 
 class NodeModel(nn.Module):
-    def __init__(self, node_input_dim: int, hidden_dim: int, out_dim: int, act_fn: str = 'relu'):
+    def __init__(self, input_dim: int, hidden_dim: int, act_fn: str = 'relu'):
         super().__init__()
 
-        self.fc1 = nn.Linear(node_input_dim, hidden_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.act1 = utils.get_act_fn(act_fn)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.ln = nn.LayerNorm(hidden_dim)
         self.act2 = utils.get_act_fn(act_fn)
-        self.fc3 = nn.Linear(hidden_dim, out_dim)
+        self.fc3 = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, node_feat: torch.Tensor, edge_index: torch.Tensor|None, edge_feat: torch.Tensor|None) -> torch.Tensor:
         if edge_feat is not None and edge_index is not None:
@@ -100,12 +100,12 @@ class NodeModel(nn.Module):
 
         return h
 
-class TransitionModelGNN(nn.Module):
-    def __init__(self, node_input_dim: int, hidden_dim: int, out_dim: int, action_dim: int, act_fn: str = 'relu') -> None:
-        super(TransitionModelGNN, self).__init__()
+class TransitionModel(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int, num_slots: int, act_fn: str = 'relu') -> None:
+        super().__init__()
         self.action_dim = action_dim
-        self._node_fn = NodeModel(node_input_dim, hidden_dim, out_dim, act_fn)
-        self._edge_fn = EdgeModel(node_input_dim, hidden_dim, act_fn)
+        self._node_fn = NodeModel(input_dim, hidden_dim, act_fn)
+        self._edge_fn = EdgeModel(input_dim, hidden_dim, act_fn)
 
         self.edge_list = None
         self.batch_size = 0
