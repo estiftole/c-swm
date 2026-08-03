@@ -147,7 +147,7 @@ class TransitionModel(nn.Module):
                 batch_size, num_nodes, states.device)
 
             row, col = edge_index
-            edge_feat = self._edge_fn( node_feat[row], node_feat[col], edge_feat)
+            edge_feat = self._edge_fn(node_feat[row], node_feat[col])
 
         action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
         action_vec = action_vec.view(-1, self.action_dim)

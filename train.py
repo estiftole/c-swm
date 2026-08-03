@@ -72,7 +72,7 @@ def main():
         dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=2,
         pin_memory=use_cuda
     )
     logging.info(f"Loaded dataset")
