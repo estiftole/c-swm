@@ -144,6 +144,12 @@ with torch.no_grad():
     print(f"--> Pos Energy (should be near 0): {pos_energy:.4f}")
     print(f"--> Latent Std (should be > 0.1):   {latent_std:.4f}")
 
+    neg_energy = (dist_matrix.sum() - torch.diag(dist_matrix).sum()).item() / (full_size * (full_size - 1))
+
+    print(f"--> Pos Energy: {pos_energy:.4f}")
+    print(f"--> Neg Energy: {neg_energy:.4f}")
+    print(f"--> Separation Ratio (Neg / Pos): {neg_energy / pos_energy:.2f}x")
+
 for k in topk:
     print('Hits @ {}: {}'.format(k, hits_at[k] / float(num_samples)))
 
