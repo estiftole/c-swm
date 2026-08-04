@@ -4,7 +4,7 @@ import numpy as np
 class ContrastiveSWM(nn.Module):
     def __init__(self, embedding_dim: int, input_dims: tuple, hidden_dim: int,
         num_slots: int, action_dim: int,
-        hinge=1., sigma=0.5,
+        hinge=1., sigma=0.5, global_action: bool = False
     ) -> None:
         super().__init__()
         self.hidden_dim = hidden_dim
@@ -22,7 +22,7 @@ class ContrastiveSWM(nn.Module):
 
         self.obj_extractor = EncoderCNN(num_channels, hidden_dim // 16 , num_slots)
         self.obj_encoder = EncoderMLP(int(np.prod(width_height)), hidden_dim, embedding_dim, num_slots)
-        self.transition_model = TransitionModel(embedding_dim, hidden_dim, action_dim, num_slots)
+        self.transition_model = TransitionModel(embedding_dim, hidden_dim, action_dim, num_slots, global_action=global_action)
 
         self.width = width_height[0]
         self.height = width_height[1]

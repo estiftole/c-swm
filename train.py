@@ -28,7 +28,7 @@ def main():
     parser.add_argument('--action-dim', type=int, default=4, help='Dimensionality of action space.')
     parser.add_argument('--num-objects', type=int, default=5, help='Number of object slots in model.')
     parser.add_argument('--ignore-action', action='store_true', default=False, help='Ignore action in GNN transition model.')
-    parser.add_argument('--copy-action', action='store_true', default=False, help='Apply same action to all object slots.')
+    parser.add_argument('--global-action', action='store_true', default=False, help='Apply same action to all object slots.')
 
 
     parser.add_argument('--no-cuda', action='store_true', default=False, help='Disable CUDA training.')
@@ -91,6 +91,7 @@ def main():
         num_slots=args.num_objects,
         sigma=args.sigma,
         hinge=args.hinge,
+        global_action=args.global_action,
 
     ).to(device)
 
@@ -145,7 +146,7 @@ def main():
 if __name__ == '__main__':
     main()
 
-# uv run train.py --dataset data/pong_train.h5 --encoder medium --embedding-dim 4 --action-dim 6 --num-objects 3 --copy-action --epochs 200 --name pong
+# uv run train.py --dataset data/pong_train.h5 --encoder medium --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
 # uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
 
 # uv run train.py --dataset data/shapes_train.h5 --encoder small --name shapes

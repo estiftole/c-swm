@@ -48,7 +48,7 @@ device = torch.device('cuda' if args.cuda else 'cpu')
 dataset = utils.PathDataset(
     hdf5_file=args.dataset, path_length=args_eval.num_steps)
 eval_loader = data.DataLoader(
-    dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
 # Get data sample
 obs = next(iter(eval_loader))[0]
@@ -63,7 +63,7 @@ model = models.ContrastiveSWM(
     sigma=args.sigma,
     hinge=args.hinge,
     # ignore_action=args.ignore_action,
-    # copy_action=args.copy_action,
+    global_action=args.global_action,
     # encoder=args.encoder
 ).to(device)
 
@@ -85,6 +85,7 @@ with torch.no_grad():
         data_batch = [[t.to(
             device) for t in tensor] for tensor in data_batch]
         observations, actions = data_batch
+
         if observations[0].size(0) != args.batch_size:
             continue
 
@@ -102,7 +103,6 @@ with torch.no_grad():
         pred_states.append(pred_state.cpu())
         next_states.append(next_state.cpu())
 
-        print("Action shape:", actions[0].shape, "Type:", actions[0].dtype)
     pred_state_cat = torch.cat(pred_states, dim=0)
     next_state_cat = torch.cat(next_states, dim=0)
 
@@ -114,18 +114,6 @@ with torch.no_grad():
 
     # dist_matrix[i, j] = distance from predicted state i to true next_state j
     dist_matrix = utils.pairwise_distance_matrix(pred_state_flat, next_state_flat)
-
-    # Diagnostic for distance matrix and duplicates
-    true_dist_0 = dist_matrix[0, 0].item()
-    min_dist_0, min_idx_0 = dist_matrix[0].min(dim=0)
-
-    print(f"Sample 0 True Target Distance:     {true_dist_0:.4f}")
-    print(f"Sample 0 Closest Target Distance:  {min_dist_0.item():.4f} (at Index {min_idx_0.item()})")
-    print(f"Number of targets closer than true target: {(dist_matrix[0] < dist_matrix[0, 0]).sum().item()}")
-
-    # Check ground-truth distance between Target 0 and Target 36
-    target_0_vs_36_dist = torch.norm(next_state_flat[0] - next_state_flat[36]).item()
-    print(f"Ground Truth Distance between Target 0 & Target 36: {target_0_vs_36_dist:.4f}")
 
     # Sort distances in ascending order (smallest distance first)
     dist_np = dist_matrix.numpy()
@@ -148,19 +136,6 @@ with torch.no_grad():
 
     pred_states = []
     next_states = []
-
-    # Quick C-SWM Health Diagnostic
-    pos_energy = (pred_state_flat - next_state_flat).pow(2).sum(dim=-1).mean().item()
-    latent_std = pred_state_flat.std(dim=0).mean().item()
-
-    print(f"--> Pos Energy (should be near 0): {pos_energy:.4f}")
-    print(f"--> Latent Std (should be > 0.1):   {latent_std:.4f}")
-
-    neg_energy = (dist_matrix.sum() - torch.diag(dist_matrix).sum()).item() / (full_size * (full_size - 1))
-
-    print(f"--> Pos Energy: {pos_energy:.4f}")
-    print(f"--> Neg Energy: {neg_energy:.4f}")
-    print(f"--> Separation Ratio (Neg / Pos): {neg_energy / pos_energy:.2f}x")
 
 for k in topk:
     print('Hits @ {}: {}'.format(k, hits_at[k] / float(num_samples)))
