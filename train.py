@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 import models
 import utils
+import pickle
 
 
 def main():
@@ -38,6 +39,7 @@ def main():
     parser.add_argument('--save-folder', type=str, default='checkpoints', help='Path to save checkpoints.')
 
     args = parser.parse_args()
+
 
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -98,6 +100,10 @@ def main():
 
 
     logging.info('Starting C-SWM model training...')
+    meta_file = os.path.join(save_folder, 'metadata.pkl')
+    with open(meta_file, 'wb') as f:
+        pickle.dump({'args': args}, f)
+    logging.info(f"Saved metadata to {meta_file}")
     best_loss = float('inf')
     model_file = os.path.join(save_folder, 'model.pt')
 
@@ -141,3 +147,6 @@ if __name__ == '__main__':
 
 # uv run train.py --dataset data/pong_train.h5 --encoder medium --embedding-dim 4 --action-dim 6 --num-objects 3 --copy-action --epochs 200 --name pong
 # uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
+
+# uv run train.py --dataset data/shapes_train.h5 --encoder small --name shapes
+# uv run eval.py --dataset data/shapes_eval.h5 --save-folder checkpoints/shapes --num-steps 1

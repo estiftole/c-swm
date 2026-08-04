@@ -151,3 +151,6 @@ if __name__ == '__main__':
     utils.save_list_dict_h5py(replay_buffer, args.fname)
 # uv run gen_data.py --env_id ALE/Pong-v5 --fname data/pong_train.h5 --num_episodes 1000 --atari --seed 1
 # uv run gen_data.py --env_id ALE/Pong-v5 --fname data/pong_eval.h5 --num_episodes 100 --atari --seed 2
+
+# python data_gen/env.py --env_id ShapesTrain-v0 --fname data/shapes_train.h5 --num_episodes 1000 --seed 1
+# python data_gen/env.py --env_id ShapesEval-v0 --fname data/shapes_eval.h5 --num_episodes 10000 --seed 2

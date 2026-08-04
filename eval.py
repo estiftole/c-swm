@@ -156,3 +156,5 @@ for k in topk:
     print('Hits @ {}: {}'.format(k, hits_at[k] / float(num_samples)))
 
 print('MRR: {}'.format(rr_sum / float(num_samples)))
+
+# uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
