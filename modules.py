@@ -165,6 +165,7 @@ class TransitionModel(nn.Module):
         #     action_vec = action_vec.view(batch_size, num_nodes, self.action_dim)
 
         if self.global_action:
+            print("Global action")
             action_vec = utils.to_one_hot(
                 action, self.action_dim).repeat(1, num_nodes)
             action_vec = action_vec.view(-1, self.action_dim)
