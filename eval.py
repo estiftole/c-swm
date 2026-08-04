@@ -115,6 +115,14 @@ with torch.no_grad():
     # dist_matrix[i, j] = distance from predicted state i to true next_state j
     dist_matrix = utils.pairwise_distance_matrix(pred_state_flat, next_state_flat)
 
+    # Diagnostic for distance matrix and duplicates
+    true_dist_0 = dist_matrix[0, 0].item()
+    min_dist_0, min_idx_0 = dist_matrix[0].min(dim=0)
+
+    print(f"Sample 0 True Target Distance:     {true_dist_0:.4f}")
+    print(f"Sample 0 Closest Target Distance:  {min_dist_0.item():.4f} (at Index {min_idx_0.item()})")
+    print(f"Number of targets closer than true target: {(dist_matrix[0] < dist_matrix[0, 0]).sum().item()}")
+
     # Sort distances in ascending order (smallest distance first)
     dist_np = dist_matrix.numpy()
     indices = np.stack([np.lexsort((np.arange(len(row)), row)) for row in dist_np], axis=0)
