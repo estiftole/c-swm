@@ -137,6 +137,13 @@ with torch.no_grad():
     pred_states = []
     next_states = []
 
+    # Quick C-SWM Health Diagnostic
+    pos_energy = (pred_state_flat - next_state_flat).pow(2).sum(dim=-1).mean().item()
+    latent_std = pred_state_flat.std(dim=0).mean().item()
+
+    print(f"--> Pos Energy (should be near 0): {pos_energy:.4f}")
+    print(f"--> Latent Std (should be > 0.1):   {latent_std:.4f}")
+
 for k in topk:
     print('Hits @ {}: {}'.format(k, hits_at[k] / float(num_samples)))
 
