@@ -108,46 +108,31 @@ with torch.no_grad():
 
     full_size = pred_state_cat.size(0)
 
-    # Flatten object/feature dimensions
+    # Flatten object/feature dimensions -> [B, N * D]
     next_state_flat = next_state_cat.view(full_size, -1)
     pred_state_flat = pred_state_cat.view(full_size, -1)
 
-    dist_matrix = utils.pairwise_distance_matrix(
-        next_state_flat, pred_state_flat)
-    dist_matrix_diag = torch.diag(dist_matrix).unsqueeze(-1)
-    dist_matrix_augmented = torch.cat(
-        [dist_matrix_diag, dist_matrix], dim=1)
+    # dist_matrix[i, j] = distance from predicted state i to true next_state j
+    dist_matrix = utils.pairwise_distance_matrix(pred_state_flat, next_state_flat)
 
-    # Workaround to get a stable sort in numpy.
-    dist_np = dist_matrix_augmented.numpy()
-    indices = []
-    for row in dist_np:
-        keys = (np.arange(len(row)), row)
-        indices.append(np.lexsort(keys))
-    indices = np.stack(indices, axis=0)
+    # Sort distances in ascending order (smallest distance first)
+    dist_np = dist_matrix.numpy()
+    indices = np.stack([np.lexsort((np.arange(len(row)), row)) for row in dist_np], axis=0)
     indices = torch.from_numpy(indices).long()
 
-    print('Processed {} batches of size {}'.format(
-        batch_idx + 1, args.batch_size))
+    # True target for sample i is index i
+    labels = torch.arange(full_size).unsqueeze(-1)
 
-    labels = torch.zeros(
-        indices.size(0), device=indices.device,
-        dtype=torch.int64).unsqueeze(-1)
+    print('Processed {} batches of size {}'.format(batch_idx + 1, args.batch_size))
+    print('Size of current topk evaluation batch: {}'.format(full_size))
 
     num_samples += full_size
-    print('Size of current topk evaluation batch: {}'.format(
-        full_size))
 
     for k in topk:
-        match = indices[:, :k] == labels
-        num_matches = match.sum()
-        hits_at[k] += num_matches.item()
+        hits_at[k] += (indices[:, :k] == labels).sum().item()
 
-    match = indices == labels
-    _, ranks = match.max(1)
-
-    reciprocal_ranks = torch.reciprocal(ranks.double() + 1)
-    rr_sum += reciprocal_ranks.sum()
+    _, ranks = (indices == labels).max(1)
+    rr_sum += torch.reciprocal(ranks.double() + 1).sum().item()
 
     pred_states = []
     next_states = []
