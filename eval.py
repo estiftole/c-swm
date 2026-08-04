@@ -85,7 +85,6 @@ with torch.no_grad():
         data_batch = [[t.to(
             device) for t in tensor] for tensor in data_batch]
         observations, actions = data_batch
-
         if observations[0].size(0) != args.batch_size:
             continue
 
@@ -103,6 +102,7 @@ with torch.no_grad():
         pred_states.append(pred_state.cpu())
         next_states.append(next_state.cpu())
 
+        print("Action shape:", actions[0].shape, "Type:", actions[0].dtype)
     pred_state_cat = torch.cat(pred_states, dim=0)
     next_state_cat = torch.cat(next_states, dim=0)
 
