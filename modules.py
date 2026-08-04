@@ -123,7 +123,7 @@ class TransitionModel(nn.Module):
             base_senders = senders[mask]
             base_receivers = receivers[mask]
 
-            batch_offsets = torch.arange(0, batch_size * num_slots, num_slots)
+            batch_offsets = torch.arange(0, batch_size * num_slots, num_slots, device=device)
             senders_batch = base_senders.unsqueeze(0) + batch_offsets.unsqueeze(1)
             receivers_batch = base_receivers.unsqueeze(0) + batch_offsets.unsqueeze(1)
 
