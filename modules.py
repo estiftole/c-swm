@@ -102,8 +102,11 @@ class NodeModel(nn.Module):
         return h
 
 class TransitionModel(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int, num_slots: int, act_fn: str = 'relu') -> None:
+    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int,
+        num_slots: int, act_fn: str = 'relu', global_action: bool = False) -> None:
+
         super().__init__()
+        self.global_action = global_action
         self.input_dim = input_dim
         self.action_dim = action_dim
         node_input_dim = hidden_dim + input_dim + self.action_dim
