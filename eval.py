@@ -34,7 +34,7 @@ model_file = os.path.join(args_eval.save_folder, 'model.pt')
 args = pickle.load(open(meta_file, 'rb'))['args']
 
 args.cuda = not args_eval.no_cuda and torch.cuda.is_available()
-args.batch_size = 100
+args.batch_size = 10
 args.dataset = args_eval.dataset
 args.seed = 0
 

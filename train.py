@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train C-SWM World Model")
 
 
-    parser.add_argument('--batch-size', type=int, default=1024, help='Batch size.')
+    parser.add_argument('--batch-size', type=int, default=10, help='Batch size.')
     parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs.')
     parser.add_argument('--learning-rate', type=float, default=5e-4, help='Learning rate.')
 
