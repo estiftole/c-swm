@@ -102,11 +102,8 @@ class NodeModel(nn.Module):
         return h
 
 class TransitionModel(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int,
-        num_slots: int, act_fn: str = 'relu', global_action: bool = False) -> None:
-
+    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int, num_slots: int, act_fn: str = 'relu') -> None:
         super().__init__()
-        self.global_action = global_action
         self.input_dim = input_dim
         self.action_dim = action_dim
         node_input_dim = hidden_dim + input_dim + self.action_dim
@@ -163,16 +160,6 @@ class TransitionModel(nn.Module):
             # Factored action (e.g. Shapes): One-hot size is action_dim * num_nodes, reshape per node
             action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
             action_vec = action_vec.view(batch_size, num_nodes, self.action_dim)
-
-        # if self.global_action:
-        #     print("Global action")
-        #     action_vec = utils.to_one_hot(
-        #         action, self.action_dim).repeat(1, num_nodes)
-        #     action_vec = action_vec.view(-1, self.action_dim)
-        # else:
-        #     action_vec = utils.to_one_hot(
-        #         action, self.action_dim * num_nodes)
-        #     action_vec = action_vec.view(-1, self.action_dim)
 
         # Attach action to each state
         node_feat = torch.cat([node_feat, action_vec], dim=-1)
