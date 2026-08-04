@@ -57,6 +57,44 @@ def to_float(np_array):
     """Convert numpy array to float32."""
     return np.array(np_array, dtype=np.float32)
 
+def pairwise_distance_matrix(x, y):
+    num_samples = x.size(0)
+    dim = x.size(1)
+
+    x = x.unsqueeze(1).expand(num_samples, num_samples, dim)
+    y = y.unsqueeze(0).expand(num_samples, num_samples, dim)
+
+    return torch.pow(x - y, 2).sum(2)
+
+class PathDataset(data.Dataset):
+    """Create dataset of {(o_t, a_t)}_{t=1:N} paths from replay buffer.
+    """
+
+    def __init__(self, hdf5_file, path_length=5):
+        """
+        Args:
+            hdf5_file (string): Path to the hdf5 file that contains experience
+                buffer
+        """
+        self.experience_buffer = load_list_dict_h5py(hdf5_file)
+        self.path_length = path_length
+
+    def __len__(self):
+        return len(self.experience_buffer)
+
+    def __getitem__(self, idx):
+        observations = []
+        actions = []
+        for i in range(self.path_length):
+            obs = to_float(self.experience_buffer[idx]['obs'][i])
+            action = self.experience_buffer[idx]['action'][i]
+            observations.append(obs)
+            actions.append(action)
+        obs = to_float(
+            self.experience_buffer[idx]['next_obs'][self.path_length - 1])
+        observations.append(obs)
+        return observations, actions
+
 class StateTransitionsDataset(data.Dataset):
     """Create dataset of (o_t, a_t, o_{t+1}) transitions from replay buffer."""
 
