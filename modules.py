@@ -155,24 +155,24 @@ class TransitionModel(nn.Module):
         # action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
         # action_vec = action_vec.view(-1, self.action_dim)
         # # Automatically detect if action is Global (Pong) or Factored (Shapes)
-        # if action.max() < self.action_dim:
-        #     # Global action (e.g. Pong): One-hot size is action_dim, broadcast to all object nodes
-        #     action_vec = utils.to_one_hot(action, self.action_dim)
-        #     action_vec = action_vec.unsqueeze(1).expand(-1, num_nodes, -1)
-        # else:
-        #     # Factored action (e.g. Shapes): One-hot size is action_dim * num_nodes, reshape per node
-        #     action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
-        #     action_vec = action_vec.view(batch_size, num_nodes, self.action_dim)
-
-        if self.global_action:
-            print("Global action")
-            action_vec = utils.to_one_hot(
-                action, self.action_dim).repeat(1, num_nodes)
-            action_vec = action_vec.view(-1, self.action_dim)
+        if action.max() < self.action_dim:
+            # Global action (e.g. Pong): One-hot size is action_dim, broadcast to all object nodes
+            action_vec = utils.to_one_hot(action, self.action_dim)
+            action_vec = action_vec.unsqueeze(1).expand(-1, num_nodes, -1)
         else:
-            action_vec = utils.to_one_hot(
-                action, self.action_dim * num_nodes)
-            action_vec = action_vec.view(-1, self.action_dim)
+            # Factored action (e.g. Shapes): One-hot size is action_dim * num_nodes, reshape per node
+            action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
+            action_vec = action_vec.view(batch_size, num_nodes, self.action_dim)
+
+        # if self.global_action:
+        #     print("Global action")
+        #     action_vec = utils.to_one_hot(
+        #         action, self.action_dim).repeat(1, num_nodes)
+        #     action_vec = action_vec.view(-1, self.action_dim)
+        # else:
+        #     action_vec = utils.to_one_hot(
+        #         action, self.action_dim * num_nodes)
+        #     action_vec = action_vec.view(-1, self.action_dim)
 
         # Attach action to each state
         node_feat = torch.cat([node_feat, action_vec], dim=-1)
