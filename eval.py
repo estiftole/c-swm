@@ -48,7 +48,7 @@ device = torch.device('cuda' if args.cuda else 'cpu')
 dataset = utils.PathDataset(
     hdf5_file=args.dataset, path_length=args_eval.num_steps)
 eval_loader = data.DataLoader(
-    dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
 # Get data sample
 obs = next(iter(eval_loader))[0]
@@ -122,6 +122,10 @@ with torch.no_grad():
     print(f"Sample 0 True Target Distance:     {true_dist_0:.4f}")
     print(f"Sample 0 Closest Target Distance:  {min_dist_0.item():.4f} (at Index {min_idx_0.item()})")
     print(f"Number of targets closer than true target: {(dist_matrix[0] < dist_matrix[0, 0]).sum().item()}")
+
+    # Check ground-truth distance between Target 0 and Target 36
+    target_0_vs_36_dist = torch.norm(next_state_flat[0] - next_state_flat[36]).item()
+    print(f"Ground Truth Distance between Target 0 & Target 36: {target_0_vs_36_dist:.4f}")
 
     # Sort distances in ascending order (smallest distance first)
     dist_np = dist_matrix.numpy()
