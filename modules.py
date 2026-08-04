@@ -164,6 +164,7 @@ class TransitionModel(nn.Module):
             action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
             action_vec = action_vec.view(batch_size, num_nodes, self.action_dim)
 
+        action_vec = action_vec.view(-1, self.action_dim)
         # Attach action to each state
         node_feat = torch.cat([node_feat, action_vec], dim=-1)
 
