@@ -134,7 +134,7 @@ def main():
             optimizer.zero_grad()
 
             if args.decoder:
-                torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
+
                 optimizer_dec.zero_grad()
                 obs, action, next_obs = data_batch
 
@@ -173,6 +173,8 @@ def main():
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), model_file)
+            if args.decoder and decoder is not None:
+                torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
             logging.info(f"--> Saved new best checkpoint (Loss: {best_loss:.6f}) to {model_file}")
 
 if __name__ == '__main__':
