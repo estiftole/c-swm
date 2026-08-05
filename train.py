@@ -4,6 +4,7 @@ import logging
 import os
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 import models
@@ -14,11 +15,9 @@ import pickle
 def main():
     parser = argparse.ArgumentParser(description="Train C-SWM World Model")
 
-
     parser.add_argument('--batch-size', type=int, default=10, help='Batch size.')
     parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs.')
     parser.add_argument('--learning-rate', type=float, default=5e-4, help='Learning rate.')
-
 
     parser.add_argument('--encoder', type=str, default='small', help='Object extractor CNN size (e.g., `small`).')
     parser.add_argument('--sigma', type=float, default=0.5, help='Energy scale.')
@@ -29,7 +28,7 @@ def main():
     parser.add_argument('--num-objects', type=int, default=5, help='Number of object slots in model.')
     parser.add_argument('--ignore-action', action='store_true', default=False, help='Ignore action in GNN transition model.')
     parser.add_argument('--global-action', action='store_true', default=False, help='Apply same action to all object slots.')
-
+    parser.add_argument('--decoder', action='store_true', default=False, help='Train model using decoder and pixel-based loss.')
 
     parser.add_argument('--no-cuda', action='store_true', default=False, help='Disable CUDA training.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
@@ -40,16 +39,12 @@ def main():
 
     args = parser.parse_args()
 
-
-
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device('cuda' if use_cuda else 'cpu')
-
 
     torch.manual_seed(args.seed)
     if use_cuda:
         torch.cuda.manual_seed(args.seed)
-
 
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     exp_name = timestamp if args.name == 'none' else args.name
@@ -68,7 +63,6 @@ def main():
     logging.info(f"Using device: {device}")
     logging.info(f"Arguments: {vars(args)}")
 
-
     dataset = utils.StateTransitionsDataset(hdf5_file=args.dataset)
     train_loader = DataLoader(
         dataset,
@@ -82,7 +76,6 @@ def main():
     sample_obs = next(iter(train_loader))[0]
     input_shape = sample_obs.shape[1:]
 
-
     model = models.ContrastiveSWM(
         embedding_dim=args.embedding_dim,
         hidden_dim=args.hidden_dim,
@@ -92,19 +85,42 @@ def main():
         sigma=args.sigma,
         hinge=args.hinge,
         global_action=args.global_action,
-
     ).to(device)
 
     model.apply(utils.weights_init)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
+    decoder = None
+    if args.decoder:
+        if args.encoder == 'large':
+            decoder = models.DecoderCNNLarge(
+                input_dim=args.embedding_dim,
+                num_objects=args.num_objects,
+                hidden_dim=args.hidden_dim // 16,
+                output_size=input_shape).to(device)
+        elif args.encoder == 'medium':
+            decoder = models.DecoderCNNMedium(
+                input_dim=args.embedding_dim,
+                num_objects=args.num_objects,
+                hidden_dim=args.hidden_dim // 16,
+                output_size=input_shape).to(device)
+        elif args.encoder == 'small':
+            decoder = models.DecoderCNNSmall(
+                input_dim=args.embedding_dim,
+                num_objects=args.num_objects,
+                hidden_dim=args.hidden_dim // 16,
+                output_size=input_shape).to(device)
+
+        decoder.apply(utils.weights_init)
+        optimizer_dec = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
 
     logging.info('Starting C-SWM model training...')
     meta_file = os.path.join(save_folder, 'metadata.pkl')
     with open(meta_file, 'wb') as f:
         pickle.dump({'args': args}, f)
     logging.info(f"Saved metadata to {meta_file}")
+
     best_loss = float('inf')
     model_file = os.path.join(save_folder, 'model.pt')
 
@@ -113,15 +129,33 @@ def main():
         total_epoch_loss = 0.0
 
         for batch_idx, data_batch in enumerate(train_loader):
-
             data_batch = [tensor.to(device) for tensor in data_batch]
 
             optimizer.zero_grad()
 
+            if args.decoder:
+                torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
+                optimizer_dec.zero_grad()
+                obs, action, next_obs = data_batch
 
-            loss = model.contrastive_loss(*data_batch)
+                objs = model.obj_extractor(obs)
+                state = model.obj_encoder(objs)
+
+                rec = torch.sigmoid(decoder(state))
+                loss = F.binary_cross_entropy(rec, obs, reduction='sum') / obs.size(0)
+
+                next_state_pred = state + model.transition_model(state, action)
+                next_rec = torch.sigmoid(decoder(next_state_pred))
+                next_loss = F.binary_cross_entropy(next_rec, next_obs, reduction='sum') / obs.size(0)
+                loss += next_loss
+            else:
+                loss = model.contrastive_loss(*data_batch)
+
             loss.backward()
             optimizer.step()
+
+            if args.decoder:
+                optimizer_dec.step()
 
             batch_loss = loss.item()
             total_epoch_loss += batch_loss
@@ -136,18 +170,17 @@ def main():
         avg_loss = total_epoch_loss / len(train_loader)
         logging.info(f"====> Epoch: {epoch:3d} | Average Loss: {avg_loss:.6f}")
 
-
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), model_file)
             logging.info(f"--> Saved new best checkpoint (Loss: {best_loss:.6f}) to {model_file}")
 
-
 if __name__ == '__main__':
     main()
 
-# uv run train.py --dataset data/pong_train.h5 --encoder medium --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
+# uv run train.py --dataset data/pong_train.h5 --encoder large --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
 # uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
 
-# uv run train.py --dataset data/shapes_train.h5 --encoder small --name shapes
-# uv run eval.py --dataset data/shapes_eval.h5 --save-folder checkpoints/shapes --num-steps 1
+
+# uv run train.py --dataset data/pong_train.h5 --encoder large --decoder --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
+# uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1

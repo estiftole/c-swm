@@ -173,3 +173,136 @@ class TransitionModel(nn.Module):
 
         # [batch_size, num_nodes, hidden_dim]
         return node_feat.view(batch_size, num_nodes, -1)
+
+class DecoderCNNSmall(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1] // 10, output_size[2] // 10
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=1, stride=1)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=10, stride=10)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.deconv1(h_conv))
+        return self.deconv2(h)
+
+
+class DecoderCNNMedium(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1] // 5, output_size[2] // 5
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=5, stride=5)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=9, padding=4)
+
+        self.ln1 = nn.BatchNorm2d(hidden_dim)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.ln1(self.deconv1(h_conv)))
+        return self.deconv2(h)
+
+
+class DecoderCNNLarge(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1], output_size[2]
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv3 = nn.ConvTranspose2d(hidden_dim, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv4 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=3, padding=1)
+
+        self.ln1 = nn.BatchNorm2d(hidden_dim)
+        self.ln2 = nn.BatchNorm2d(hidden_dim)
+        self.ln3 = nn.BatchNorm2d(hidden_dim)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+        self.act4 = utils.get_act_fn(act_fn)
+        self.act5 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.ln1(self.deconv1(h_conv)))
+        h = self.act4(self.ln1(self.deconv2(h)))
+        h = self.act5(self.ln1(self.deconv3(h)))
+        return self.deconv4(h)
