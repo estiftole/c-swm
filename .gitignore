@@ -1,6 +1,8 @@
 # uv virtual environment (default location)
 .venv/
 .uv/
+data/
+checkpoints/
 
 # Python build and distribution artifacts
 __pycache__/

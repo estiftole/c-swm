@@ -102,8 +102,11 @@ class NodeModel(nn.Module):
         return h
 
 class TransitionModel(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int, num_slots: int, act_fn: str = 'relu') -> None:
+    def __init__(self, input_dim: int, hidden_dim: int, action_dim: int,
+        num_slots: int, act_fn: str = 'relu', global_action: bool = False) -> None:
+
         super().__init__()
+        self.global_action = global_action
         self.input_dim = input_dim
         self.action_dim = action_dim
         node_input_dim = hidden_dim + input_dim + self.action_dim
@@ -123,7 +126,7 @@ class TransitionModel(nn.Module):
             base_senders = senders[mask]
             base_receivers = receivers[mask]
 
-            batch_offsets = torch.arange(0, batch_size * num_slots, num_slots)
+            batch_offsets = torch.arange(0, batch_size * num_slots, num_slots, device=device)
             senders_batch = base_senders.unsqueeze(0) + batch_offsets.unsqueeze(1)
             receivers_batch = base_receivers.unsqueeze(0) + batch_offsets.unsqueeze(1)
 
@@ -147,10 +150,21 @@ class TransitionModel(nn.Module):
                 batch_size, num_nodes, states.device)
 
             row, col = edge_index
-            edge_feat = self._edge_fn( node_feat[row], node_feat[col], edge_feat)
+            edge_feat = self._edge_fn(node_feat[row], node_feat[col])
 
-        action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
-        action_vec = action_vec.view(-1, self.action_dim)
+        # action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
+        # action_vec = action_vec.view(-1, self.action_dim)
+        # # Automatically detect if action is Global (Pong) or Factored (Shapes)
+        # if action.max() < self.action_dim:
+        if self.global_action:
+            # Global action (e.g. Pong): One-hot size is action_dim, broadcast to all object nodes
+            action_vec = utils.to_one_hot(action, self.action_dim)
+            action_vec = action_vec.unsqueeze(1).expand(-1, num_nodes, -1)
+        else:
+            # Factored action (e.g. Shapes): One-hot size is action_dim * num_nodes, reshape per node
+            action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
+
+        action_vec = action_vec.reshape(-1, self.action_dim)
 
         # Attach action to each state
         node_feat = torch.cat([node_feat, action_vec], dim=-1)
@@ -159,3 +173,136 @@ class TransitionModel(nn.Module):
 
         # [batch_size, num_nodes, hidden_dim]
         return node_feat.view(batch_size, num_nodes, -1)
+
+class DecoderCNNSmall(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1] // 10, output_size[2] // 10
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=1, stride=1)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=10, stride=10)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.deconv1(h_conv))
+        return self.deconv2(h)
+
+
+class DecoderCNNMedium(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1] // 5, output_size[2] // 5
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=5, stride=5)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=9, padding=4)
+
+        self.ln1 = nn.BatchNorm2d(hidden_dim)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.ln1(self.deconv1(h_conv)))
+        return self.deconv2(h)
+
+
+class DecoderCNNLarge(nn.Module):
+    """CNN decoder, maps latent state to image."""
+
+    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+                 act_fn='relu'):
+        super().__init__()
+
+        width, height = output_size[1], output_size[2]
+
+        output_dim = width * height
+
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.ln = nn.LayerNorm(hidden_dim)
+
+        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv2 = nn.ConvTranspose2d(hidden_dim, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv3 = nn.ConvTranspose2d(hidden_dim, hidden_dim,
+                                          kernel_size=3, padding=1)
+        self.deconv4 = nn.ConvTranspose2d(hidden_dim, output_size[0],
+                                          kernel_size=3, padding=1)
+
+        self.ln1 = nn.BatchNorm2d(hidden_dim)
+        self.ln2 = nn.BatchNorm2d(hidden_dim)
+        self.ln3 = nn.BatchNorm2d(hidden_dim)
+
+        self.input_dim = input_dim
+        self.num_objects = num_objects
+        self.map_size = output_size[0], width, height
+
+        self.act1 = utils.get_act_fn(act_fn)
+        self.act2 = utils.get_act_fn(act_fn)
+        self.act3 = utils.get_act_fn(act_fn)
+        self.act4 = utils.get_act_fn(act_fn)
+        self.act5 = utils.get_act_fn(act_fn)
+
+    def forward(self, ins):
+        h = self.act1(self.fc1(ins))
+        h = self.act2(self.ln(self.fc2(h)))
+        h = self.fc3(h)
+
+        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+                        self.map_size[2])
+        h = self.act3(self.ln1(self.deconv1(h_conv)))
+        h = self.act4(self.ln1(self.deconv2(h)))
+        h = self.act5(self.ln1(self.deconv3(h)))
+        return self.deconv4(h)
