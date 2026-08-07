@@ -60,7 +60,7 @@ model = models.ContrastiveSWM(
     num_objects=args.num_objects,
     sigma=args.sigma,
     hinge=args.hinge,
-    global_action=args.copy_action,
+    global_action=args.global_action,
     # encoder=args.encoder
 ).to(device)
 
