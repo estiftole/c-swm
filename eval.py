@@ -83,10 +83,11 @@ if getattr(args, 'decoder', False):
         print(f"Warning: {decoder_file} not found. Reconstruction loss will be skipped.")
         decoder = None
 
+# Initialize empty lists to store all predictions globally
+pred_states = []
+next_states = []
+
 topk = [1]
-hits_at = defaultdict(int)
-num_samples = 0
-rr_sum = 0
 bce_loss_sum = 0.0
 
 print(f'Running eval on {args_eval.num_steps} steps...')
@@ -109,6 +110,10 @@ with torch.no_grad():
             pred_trans = model.transition_model(pred_state, actions[i])
             pred_state = pred_state + pred_trans
 
+        # Just save the states, don't compute metrics yet!
+        pred_states.append(pred_state.cpu())
+        next_states.append(next_state.cpu())
+
         if decoder is not None:
             pred_rec = torch.sigmoid(decoder(pred_state))
             bce_loss_sum += F.binary_cross_entropy(pred_rec, next_obs, reduction='sum').item()
@@ -122,33 +127,42 @@ with torch.no_grad():
                 }
                 torch.save(rollout_data, os.path.join(args_eval.save_folder, f'rollout_{args_eval.num_steps}steps.pt'))
 
-        # --- PER-BATCH METRICS COMPUTATION (100 candidates per batch) ---
-        b_size = pred_state.size(0)
-        pred_flat = pred_state.view(b_size, -1)
-        next_flat = next_state.view(b_size, -1)
+# --- GLOBAL METRICS COMPUTATION (Outside the loop) ---
+print("Computing global Top-K metrics...")
 
-        dist_matrix = utils.pairwise_distance_matrix(pred_flat.cpu(), next_flat.cpu())
-        dist_np = dist_matrix.numpy()
+# 1. Combine all collected batches into giant tensors
+pred_state_cat = torch.cat(pred_states, dim=0)
+next_state_cat = torch.cat(next_states, dim=0)
 
-        indices = np.stack([np.lexsort((np.arange(len(row)), row)) for row in dist_np], axis=0)
-        indices = torch.from_numpy(indices).long()
+num_samples = pred_state_cat.size(0)
 
-        labels = torch.arange(b_size).unsqueeze(-1)
+# 2. Flatten objects: [N, num_objects, hidden_dim] -> [N, num_objects * hidden_dim]
+pred_flat = pred_state_cat.view(num_samples, -1)
+next_flat = next_state_cat.view(num_samples, -1)
 
-        num_samples += b_size
+# 3. Compute L2 distances between ALL predictions and ALL targets [N, N]
+# Using torch.cdist for optimized C++ distance matrix calculation
+dist_matrix = torch.cdist(pred_flat, next_flat)
 
-        for k in topk:
-            hits_at[k] += (indices[:, :k] == labels).sum().item()
+# 4. Sort distances in ascending order (smallest distance is the best match)
+_, sorted_indices = torch.sort(dist_matrix, dim=-1, descending=False)
 
-        _, ranks = (indices == labels).max(1)
-        rr_sum += torch.reciprocal(ranks.double() + 1).sum().item()
+# The correct target label for row i is column i
+labels = torch.arange(num_samples).unsqueeze(1)
 
-print(f'Processed {num_samples} evaluation samples across batches.')
+print(f'Processed {num_samples} evaluation samples globally.')
+
+# 5. Compute Hits @ K
 for k in topk:
-    print(f'Hits @ {k}: {hits_at[k] / float(num_samples):.4f}')
+    hits = (sorted_indices[:, :k] == labels).sum().item()
+    print(f'Hits @ {k}: {hits / float(num_samples):.4f}')
 
+# 6. Compute Mean Reciprocal Rank (MRR)
+_, ranks = (sorted_indices == labels).max(dim=1)
+rr_sum = torch.reciprocal(ranks.double() + 1).sum().item()
 print(f'MRR: {rr_sum / float(num_samples):.4f}')
 
+# 7. Compute Pixel BCE Loss (if using a decoder)
 if decoder is not None and num_samples > 0:
     avg_pixel_bce = bce_loss_sum / (num_samples * input_shape.numel())
     print(f'Pixel BCE Loss: {avg_pixel_bce:.6f}')
