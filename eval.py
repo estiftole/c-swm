@@ -83,7 +83,7 @@ if getattr(args, 'decoder', False):
         print(f"Warning: {decoder_file} not found. Reconstruction loss will be skipped.")
         decoder = None
 
-topk = [1, 5, 10]
+topk = [1]
 hits_at = defaultdict(int)
 num_samples = 0
 rr_sum = 0
