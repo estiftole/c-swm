@@ -7,27 +7,18 @@ class EncoderCNN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, num_slots: int, act_fn: str ="sigmoid", act_fn_hid: str ="relu") -> None:
         super().__init__()
 
-        self.cnn1 = nn.Conv2d(input_dim, hidden_dim, (3,3), padding=1)
+        self.cnn1 = nn.Conv2d(
+            input_dim, hidden_dim, (9, 9), padding=4)
         self.act1 = utils.get_act_fn(act_fn_hid)
         self.ln1 = nn.BatchNorm2d(hidden_dim)
 
-        self.cnn2 = nn.Conv2d(hidden_dim, hidden_dim, (3,3), padding=1)
-        self.act2 = utils.get_act_fn(act_fn_hid)
-        self.ln2 = nn.BatchNorm2d(hidden_dim)
+        self.cnn2 = nn.Conv2d(
+            hidden_dim, num_slots, (5, 5), stride=5)
+        self.act2 = utils.get_act_fn(act_fn)
 
-        self.cnn3 = nn.Conv2d(hidden_dim, hidden_dim, (3,3), padding=1)
-        self.act3 = utils.get_act_fn(act_fn_hid)
-        self.ln3 = nn.BatchNorm2d(hidden_dim)
-
-        self.cnn4 = nn.Conv2d(hidden_dim, num_slots, (3, 3), padding=1)
-        self.act4 = utils.get_act_fn(act_fn)
-
-    def forward(self, obs: torch.Tensor) -> torch.Tensor:
+    def forward(self, obs):
         h = self.act1(self.ln1(self.cnn1(obs)))
-        h = self.act2(self.ln2(self.cnn2(h)))
-        h = self.act3(self.ln3(self.cnn3(h)))
-        h = self.act4(self.cnn4(h))
-
+        h = self.act2(self.cnn2(h))
         return h
 
 class EncoderMLP(nn.Module):
