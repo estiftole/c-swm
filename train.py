@@ -139,13 +139,12 @@ def main():
 
         for batch_idx, data_batch in enumerate(train_loader):
             data_batch = [tensor.to(device) for tensor in data_batch]
+            obs, action, next_obs = data_batch
 
             optimizer.zero_grad()
 
             if args.decoder:
-
                 optimizer_dec.zero_grad()
-                obs, action, next_obs = data_batch
 
                 objs = model.obj_extractor(obs)
                 state = model.obj_encoder(objs)
@@ -158,7 +157,7 @@ def main():
                 next_loss = F.binary_cross_entropy(next_rec, next_obs, reduction='sum') / obs.size(0)
                 loss += next_loss
             else:
-                loss = model.contrastive_loss(*data_batch)
+                loss = model.contrastive_loss(obs, action, next_obs)
 
             loss.backward()
             optimizer.step()
@@ -166,13 +165,18 @@ def main():
             if args.decoder:
                 optimizer_dec.step()
 
-            # Save the latent dynamics of the very first batch of the epoch to analyze the physics predictions later.
+            # Save the latent dynamics of the first batch for downstream physics analysis
             if batch_idx == 0:
+                with torch.no_grad():
+                    objs = model.obj_extractor(obs)
+                    state = model.obj_encoder(objs)
+                    next_state_pred = state + model.transition_model(state, action)
+
                 latent_data = {
                     'obs': obs.detach().cpu(),
                     'action': action.detach().cpu(),
-                    'state': state.detach().cpu() if args.decoder else None,
-                    'next_state_pred': next_state_pred.detach().cpu() if args.decoder else None
+                    'state': state.detach().cpu(),
+                    'next_state_pred': next_state_pred.detach().cpu()
                 }
                 torch.save(latent_data, os.path.join(save_folder, f'latents_epoch_{epoch}.pt'))
 
