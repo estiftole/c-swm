@@ -73,8 +73,17 @@ def main():
     )
     logging.info(f"Loaded dataset")
 
-    sample_obs = next(iter(train_loader))[0]
+    sample_obs, sample_action, _ = next(iter(train_loader))
     input_shape = sample_obs.shape[1:]
+
+    max_action_in_batch = int(sample_action.max().item())
+    if max_action_in_batch >= args.action_dim:
+        raise ValueError(
+            f"CRITICAL: Dataset contains action index {max_action_in_batch}, "
+            f"but model --action-dim is only {args.action_dim}.\n"
+            f"Fix: Rerun script with --action-dim {max_action_in_batch + 1} "
+            f"(e.g., 4 for Breakout, 18 for Centipede)."
+        )
 
     model = models.ContrastiveSWM(
         embedding_dim=args.embedding_dim,
@@ -156,6 +165,16 @@ def main():
 
             if args.decoder:
                 optimizer_dec.step()
+
+            # Save the latent dynamics of the very first batch of the epoch to analyze the physics predictions later.
+            if batch_idx == 0:
+                latent_data = {
+                    'obs': obs.detach().cpu(),
+                    'action': action.detach().cpu(),
+                    'state': state.detach().cpu() if args.decoder else None,
+                    'next_state_pred': next_state_pred.detach().cpu() if args.decoder else None
+                }
+                torch.save(latent_data, os.path.join(save_folder, f'latents_epoch_{epoch}.pt'))
 
             batch_loss = loss.item()
             total_epoch_loss += batch_loss
