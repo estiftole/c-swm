@@ -1,211 +1,203 @@
 import argparse
-import datetime
-import logging
-import os
-
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-
-import models
 import utils
+import datetime
+import os
 import pickle
 
+import numpy as np
+import logging
 
-def main():
-    parser = argparse.ArgumentParser(description="Train C-SWM World Model")
+from torch.utils import data
+import torch.nn.functional as F
 
-    parser.add_argument('--batch-size', type=int, default=10, help='Batch size.')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs.')
-    parser.add_argument('--learning-rate', type=float, default=5e-4, help='Learning rate.')
+import models, modules
 
-    parser.add_argument('--encoder', type=str, default='small', help='Object extractor CNN size (e.g., `small`).')
-    parser.add_argument('--sigma', type=float, default=0.5, help='Energy scale.')
-    parser.add_argument('--hinge', type=float, default=1.0, help='Hinge threshold parameter.')
-    parser.add_argument('--hidden-dim', type=int, default=512, help='Number of hidden units in transition MLP.')
-    parser.add_argument('--embedding-dim', type=int, default=2, help='Dimensionality of embedding.')
-    parser.add_argument('--action-dim', type=int, default=4, help='Dimensionality of action space.')
-    parser.add_argument('--num-objects', type=int, default=5, help='Number of object slots in model.')
-    parser.add_argument('--ignore-action', action='store_true', default=False, help='Ignore action in GNN transition model.')
-    parser.add_argument('--global-action', action='store_true', default=False, help='Apply same action to all object slots.')
-    parser.add_argument('--decoder', action='store_true', default=False, help='Train model using decoder and pixel-based loss.')
 
-    parser.add_argument('--no-cuda', action='store_true', default=False, help='Disable CUDA training.')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-    parser.add_argument('--log-interval', type=int, default=20, help='How many batches to wait before logging.')
-    parser.add_argument('--dataset', type=str, default='data/shapes_train.h5', help='Path to replay buffer.')
-    parser.add_argument('--name', type=str, default='none', help='Experiment name.')
-    parser.add_argument('--save-folder', type=str, default='checkpoints', help='Path to save checkpoints.')
+parser = argparse.ArgumentParser()
+parser.add_argument('--batch-size', type=int, default=1024,
+                    help='Batch size.')
+parser.add_argument('--epochs', type=int, default=100,
+                    help='Number of training epochs.')
+parser.add_argument('--learning-rate', type=float, default=5e-4,
+                    help='Learning rate.')
 
-    args = parser.parse_args()
+parser.add_argument('--encoder', type=str, default='small',
+                    help='Object extrator CNN size (e.g., `small`).')
+parser.add_argument('--sigma', type=float, default=0.5,
+                    help='Energy scale.')
+parser.add_argument('--hinge', type=float, default=1.,
+                    help='Hinge threshold parameter.')
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    device = torch.device('cuda' if use_cuda else 'cpu')
+parser.add_argument('--hidden-dim', type=int, default=512,
+                    help='Number of hidden units in transition MLP.')
+parser.add_argument('--embedding-dim', type=int, default=2,
+                    help='Dimensionality of embedding.')
+parser.add_argument('--action-dim', type=int, default=4,
+                    help='Dimensionality of action space.')
+parser.add_argument('--num-slots', type=int, default=5,
+                    help='Number of object slots in model.')
+parser.add_argument('--ignore-action', action='store_true', default=False,
+                    help='Ignore action in GNN transition model.')
+parser.add_argument('--global-action', action='store_true', default=False,
+                    help='Apply same action to all object slots.')
 
-    torch.manual_seed(args.seed)
-    if use_cuda:
-        torch.cuda.manual_seed(args.seed)
+parser.add_argument('--decoder', action='store_true', default=False,
+                    help='Train model using decoder and pixel-based loss.')
 
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    exp_name = timestamp if args.name == 'none' else args.name
-    save_folder = os.path.join(args.save_folder, exp_name)
-    os.makedirs(save_folder, exist_ok=True)
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='Disable CUDA training.')
+parser.add_argument('--seed', type=int, default=42,
+                    help='Random seed (default: 42).')
+parser.add_argument('--log-interval', type=int, default=20,
+                    help='How many batches to wait before logging'
+                         'training status.')
+parser.add_argument('--dataset', type=str,
+                    default='data/shapes_train.h5',
+                    help='Path to replay buffer.')
+parser.add_argument('--name', type=str, default='none',
+                    help='Experiment name.')
+parser.add_argument('--save-folder', type=str,
+                    default='checkpoints',
+                    help='Path to checkpoints.')
 
-    log_file = os.path.join(save_folder, 'train.log')
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler()
-        ]
-    )
-    logging.info(f"Using device: {device}")
-    logging.info(f"Arguments: {vars(args)}")
+args = parser.parse_args()
+args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-    dataset = utils.StateTransitionsDataset(hdf5_file=args.dataset)
-    train_loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=2,
-        pin_memory=use_cuda
-    )
-    logging.info(f"Loaded dataset")
+now = datetime.datetime.now()
+timestamp = now.isoformat()
 
-    sample_obs, sample_action, _ = next(iter(train_loader))
-    input_shape = sample_obs.shape[1:]
+if args.name == 'none':
+    exp_name = timestamp
+else:
+    exp_name = args.name
 
-    max_action_in_batch = int(sample_action.max().item())
-    if max_action_in_batch >= args.action_dim:
-        raise ValueError(
-            f"CRITICAL: Dataset contains action index {max_action_in_batch}, "
-            f"but model --action-dim is only {args.action_dim}.\n"
-            f"Fix: Rerun script with --action-dim {max_action_in_batch + 1} "
-            f"(e.g., 4 for Breakout, 18 for Centipede)."
-        )
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
 
-    model = models.ContrastiveSWM(
-        embedding_dim=args.embedding_dim,
-        hidden_dim=args.hidden_dim,
-        action_dim=args.action_dim,
-        input_dims=input_shape,
-        num_slots=args.num_objects,
-        sigma=args.sigma,
-        hinge=args.hinge,
-        global_action=args.global_action,
-    ).to(device)
+exp_counter = 0
+save_folder = '{}/{}/'.format(args.save_folder, exp_name)
 
-    model.apply(utils.weights_init)
+if not os.path.exists(save_folder):
+    os.makedirs(save_folder)
+meta_file = os.path.join(save_folder, 'metadata.pkl')
+model_file = os.path.join(save_folder, 'model.pt')
+log_file = os.path.join(save_folder, 'log.txt')
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger()
+logger.addHandler(logging.FileHandler(log_file, 'a'))
+print = logger.info
 
-    decoder = None
-    if args.decoder:
-        if args.encoder == 'large':
-            decoder = models.DecoderCNNLarge(
-                input_dim=args.embedding_dim,
-                num_objects=args.num_objects,
-                hidden_dim=args.hidden_dim // 16,
-                output_size=input_shape).to(device)
-        elif args.encoder == 'medium':
-            decoder = models.DecoderCNNMedium(
-                input_dim=args.embedding_dim,
-                num_objects=args.num_objects,
-                hidden_dim=args.hidden_dim // 16,
-                output_size=input_shape).to(device)
-        elif args.encoder == 'small':
-            decoder = models.DecoderCNNSmall(
-                input_dim=args.embedding_dim,
-                num_objects=args.num_objects,
-                hidden_dim=args.hidden_dim // 16,
-                output_size=input_shape).to(device)
+pickle.dump({'args': args}, open(meta_file, "wb"))
 
-        decoder.apply(utils.weights_init)
-        optimizer_dec = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
+device = torch.device('cuda' if args.cuda else 'cpu')
 
-    logging.info('Starting C-SWM model training...')
-    meta_file = os.path.join(save_folder, 'metadata.pkl')
-    with open(meta_file, 'wb') as f:
-        pickle.dump({'args': args}, f)
-    logging.info(f"Saved metadata to {meta_file}")
+dataset = utils.StateTransitionsDataset(
+    hdf5_file=args.dataset)
+train_loader = data.DataLoader(
+    dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
-    best_loss = float('inf')
-    model_file = os.path.join(save_folder, 'model.pt')
+# Get data sample
+obs = next(iter(train_loader))[0]
+input_shape = obs[0].size()
 
-    for epoch in range(1, args.epochs + 1):
-        model.train()
-        total_epoch_loss = 0.0
+model = models.ContrastiveSWM(
+    embedding_dim=args.embedding_dim,
+    hidden_dim=args.hidden_dim,
+    action_dim=args.action_dim,
+    input_dims=input_shape,
+    num_slots=args.num_slots,
+    sigma=args.sigma,
+    hinge=args.hinge,
+    global_action=args.global_action).to(device)
 
-        for batch_idx, data_batch in enumerate(train_loader):
-            data_batch = [tensor.to(device) for tensor in data_batch]
+model.apply(utils.weights_init)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=args.learning_rate)
+
+if args.decoder:
+    if args.encoder == 'large':
+        decoder = modules.DecoderCNNLarge(
+            input_dim=args.embedding_dim,
+            num_slots=args.num_slots,
+            hidden_dim=args.hidden_dim // 16,
+            output_size=input_shape).to(device)
+    elif args.encoder == 'medium':
+        decoder = modules.DecoderCNNMedium(
+            input_dim=args.embedding_dim,
+            num_slots=args.num_slots,
+            hidden_dim=args.hidden_dim // 16,
+            output_size=input_shape).to(device)
+    elif args.encoder == 'small':
+        decoder = modules.DecoderCNNSmall(
+            input_dim=args.embedding_dim,
+            num_slots=args.num_slots,
+            hidden_dim=args.hidden_dim // 16,
+            output_size=input_shape).to(device)
+    decoder.apply(utils.weights_init)
+    optimizer_dec = torch.optim.Adam(
+        decoder.parameters(),
+        lr=args.learning_rate)
+
+
+# Train model.
+print('Starting model training...')
+step = 0
+best_loss = 1e9
+
+for epoch in range(1, args.epochs + 1):
+    model.train()
+    train_loss = 0
+
+    for batch_idx, data_batch in enumerate(train_loader):
+        data_batch = [tensor.to(device) for tensor in data_batch]
+        optimizer.zero_grad()
+
+        if args.decoder:
+            optimizer_dec.zero_grad()
             obs, action, next_obs = data_batch
+            objs = model.obj_extractor(obs)
+            state = model.obj_encoder(objs)
 
-            optimizer.zero_grad()
+            rec = torch.sigmoid(decoder(state))
+            loss = F.binary_cross_entropy(
+                rec, obs, reduction='sum') / obs.size(0)
 
-            if args.decoder:
-                optimizer_dec.zero_grad()
+            next_state_pred = state + model.transition_model(state, action)
+            next_rec = torch.sigmoid(decoder(next_state_pred))
+            next_loss = F.binary_cross_entropy(
+                next_rec, next_obs,
+                reduction='sum') / obs.size(0)
+            loss += next_loss
+        else:
+            loss = model.contrastive_loss(*data_batch)
 
-                objs = model.obj_extractor(obs)
-                state = model.obj_encoder(objs)
+        loss.backward()
+        train_loss += loss.item()
+        optimizer.step()
 
-                rec = torch.sigmoid(decoder(state))
-                loss = F.binary_cross_entropy(rec, obs, reduction='sum') / obs.size(0)
+        if args.decoder:
+            optimizer_dec.step()
 
-                next_state_pred = state + model.transition_model(state, action)
-                next_rec = torch.sigmoid(decoder(next_state_pred))
-                next_loss = F.binary_cross_entropy(next_rec, next_obs, reduction='sum') / obs.size(0)
-                loss += next_loss
-            else:
-                loss = model.contrastive_loss(obs, action, next_obs)
+        if batch_idx % args.log_interval == 0:
+            print(
+                'Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data_batch[0]),
+                    len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader),
+                    loss.item() / len(data_batch[0])))
 
-            loss.backward()
-            optimizer.step()
+        step += 1
 
-            if args.decoder:
-                optimizer_dec.step()
+    avg_loss = train_loss / len(train_loader.dataset)
+    print('====> Epoch: {} Average loss: {:.6f}'.format(
+        epoch, avg_loss))
 
-            # Save the latent dynamics of the first batch for downstream physics analysis
-            if batch_idx == 0:
-                with torch.no_grad():
-                    objs = model.obj_extractor(obs)
-                    state = model.obj_encoder(objs)
-                    next_state_pred = state + model.transition_model(state, action)
-
-                latent_data = {
-                    'obs': obs.detach().cpu(),
-                    'action': action.detach().cpu(),
-                    'state': state.detach().cpu(),
-                    'next_state_pred': next_state_pred.detach().cpu()
-                }
-                torch.save(latent_data, os.path.join(save_folder, f'latents_epoch_{epoch}.pt'))
-
-            batch_loss = loss.item()
-            total_epoch_loss += batch_loss
-
-            if batch_idx % args.log_interval == 0:
-                percent_complete = 100.0 * batch_idx / len(train_loader)
-                logging.info(
-                    f"Epoch: {epoch:3d} [{batch_idx * len(data_batch[0]):5d}/{len(dataset):5d} "
-                    f"({percent_complete:3.0f}%)]\tLoss: {batch_loss:.6f}"
-                )
-
-        avg_loss = total_epoch_loss / len(train_loader)
-        logging.info(f"====> Epoch: {epoch:3d} | Average Loss: {avg_loss:.6f}")
-
-        if avg_loss < best_loss:
-            best_loss = avg_loss
-            torch.save(model.state_dict(), model_file)
-            if args.decoder and decoder is not None:
-                torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
-            logging.info(f"--> Saved new best checkpoint (Loss: {best_loss:.6f}) to {model_file}")
-
-if __name__ == '__main__':
-    main()
-
-# uv run train.py --dataset data/pong_train.h5 --encoder large --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
-# uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
-
-
-# uv run train.py --dataset data/pong_train.h5 --encoder large --decoder --embedding-dim 4 --action-dim 6 --num-objects 3 --global-action --epochs 200 --name pong
-# uv run eval.py --dataset data/pong_eval.h5 --save-folder checkpoints/pong --num-steps 1
+    if avg_loss < best_loss:
+        best_loss = avg_loss
+        torch.save(model.state_dict(), model_file)

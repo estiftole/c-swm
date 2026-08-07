@@ -177,7 +177,7 @@ class TransitionModel(nn.Module):
 class DecoderCNNSmall(nn.Module):
     """CNN decoder, maps latent state to image."""
 
-    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+    def __init__(self, input_dim, hidden_dim, num_slots, output_size,
                  act_fn='relu'):
         super().__init__()
 
@@ -190,13 +190,13 @@ class DecoderCNNSmall(nn.Module):
         self.fc3 = nn.Linear(hidden_dim, output_dim)
         self.ln = nn.LayerNorm(hidden_dim)
 
-        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+        self.deconv1 = nn.ConvTranspose2d(num_slots, hidden_dim,
                                           kernel_size=1, stride=1)
         self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
                                           kernel_size=10, stride=10)
 
         self.input_dim = input_dim
-        self.num_objects = num_objects
+        self.num_slots = num_slots
         self.map_size = output_size[0], width, height
 
         self.act1 = utils.get_act_fn(act_fn)
@@ -208,7 +208,7 @@ class DecoderCNNSmall(nn.Module):
         h = self.act2(self.ln(self.fc2(h)))
         h = self.fc3(h)
 
-        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+        h_conv = h.view(-1, self.num_slots, self.map_size[1],
                         self.map_size[2])
         h = self.act3(self.deconv1(h_conv))
         return self.deconv2(h)
@@ -217,7 +217,7 @@ class DecoderCNNSmall(nn.Module):
 class DecoderCNNMedium(nn.Module):
     """CNN decoder, maps latent state to image."""
 
-    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+    def __init__(self, input_dim, hidden_dim, num_slots, output_size,
                  act_fn='relu'):
         super().__init__()
 
@@ -230,7 +230,7 @@ class DecoderCNNMedium(nn.Module):
         self.fc3 = nn.Linear(hidden_dim, output_dim)
         self.ln = nn.LayerNorm(hidden_dim)
 
-        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+        self.deconv1 = nn.ConvTranspose2d(num_slots, hidden_dim,
                                           kernel_size=5, stride=5)
         self.deconv2 = nn.ConvTranspose2d(hidden_dim, output_size[0],
                                           kernel_size=9, padding=4)
@@ -238,7 +238,7 @@ class DecoderCNNMedium(nn.Module):
         self.ln1 = nn.BatchNorm2d(hidden_dim)
 
         self.input_dim = input_dim
-        self.num_objects = num_objects
+        self.num_slots = num_slots
         self.map_size = output_size[0], width, height
 
         self.act1 = utils.get_act_fn(act_fn)
@@ -250,7 +250,7 @@ class DecoderCNNMedium(nn.Module):
         h = self.act2(self.ln(self.fc2(h)))
         h = self.fc3(h)
 
-        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+        h_conv = h.view(-1, self.num_slots, self.map_size[1],
                         self.map_size[2])
         h = self.act3(self.ln1(self.deconv1(h_conv)))
         return self.deconv2(h)
@@ -259,7 +259,7 @@ class DecoderCNNMedium(nn.Module):
 class DecoderCNNLarge(nn.Module):
     """CNN decoder, maps latent state to image."""
 
-    def __init__(self, input_dim, hidden_dim, num_objects, output_size,
+    def __init__(self, input_dim, hidden_dim, num_slots, output_size,
                  act_fn='relu'):
         super().__init__()
 
@@ -272,7 +272,7 @@ class DecoderCNNLarge(nn.Module):
         self.fc3 = nn.Linear(hidden_dim, output_dim)
         self.ln = nn.LayerNorm(hidden_dim)
 
-        self.deconv1 = nn.ConvTranspose2d(num_objects, hidden_dim,
+        self.deconv1 = nn.ConvTranspose2d(num_slots, hidden_dim,
                                           kernel_size=3, padding=1)
         self.deconv2 = nn.ConvTranspose2d(hidden_dim, hidden_dim,
                                           kernel_size=3, padding=1)
@@ -286,7 +286,7 @@ class DecoderCNNLarge(nn.Module):
         self.ln3 = nn.BatchNorm2d(hidden_dim)
 
         self.input_dim = input_dim
-        self.num_objects = num_objects
+        self.num_slots = num_slots
         self.map_size = output_size[0], width, height
 
         self.act1 = utils.get_act_fn(act_fn)
@@ -300,7 +300,7 @@ class DecoderCNNLarge(nn.Module):
         h = self.act2(self.ln(self.fc2(h)))
         h = self.fc3(h)
 
-        h_conv = h.view(-1, self.num_objects, self.map_size[1],
+        h_conv = h.view(-1, self.num_slots, self.map_size[1],
                         self.map_size[2])
         h = self.act3(self.ln1(self.deconv1(h_conv)))
         h = self.act4(self.ln1(self.deconv2(h)))
