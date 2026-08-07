@@ -193,10 +193,12 @@ def main():
         avg_loss = total_epoch_loss / len(train_loader)
         logging.info(f"====> Epoch: {epoch:3d} | Average Loss: {avg_loss:.6f}")
 
-        if epoch % 10 == 0 or epoch == args.epochs:
+        if avg_loss < best_loss:
+            best_loss = avg_loss
             torch.save(model.state_dict(), model_file)
             if args.decoder and decoder is not None:
                 torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
+            logging.info(f"--> Saved new best checkpoint (Loss: {best_loss:.6f}) to {model_file}")
 
 if __name__ == '__main__':
     main()
