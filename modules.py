@@ -155,8 +155,8 @@ class TransitionModel(nn.Module):
         # action_vec = utils.to_one_hot(action, self.action_dim * num_nodes)
         # action_vec = action_vec.view(-1, self.action_dim)
         # # Automatically detect if action is Global (Pong) or Factored (Shapes)
-        # if action.max() < self.action_dim:
-        if self.global_action:
+        if action.max() < self.action_dim:
+        # if self.global_action:
             # Global action (e.g. Pong): One-hot size is action_dim, broadcast to all object nodes
             action_vec = utils.to_one_hot(action, self.action_dim)
             action_vec = action_vec.unsqueeze(1).expand(-1, num_nodes, -1)
