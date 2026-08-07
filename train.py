@@ -73,8 +73,17 @@ def main():
     )
     logging.info(f"Loaded dataset")
 
-    sample_obs = next(iter(train_loader))[0]
+    sample_obs, sample_action, _ = next(iter(train_loader))
     input_shape = sample_obs.shape[1:]
+
+    max_action_in_batch = int(sample_action.max().item())
+    if max_action_in_batch >= args.action_dim:
+        raise ValueError(
+            f"CRITICAL: Dataset contains action index {max_action_in_batch}, "
+            f"but model --action-dim is only {args.action_dim}.\n"
+            f"Fix: Rerun script with --action-dim {max_action_in_batch + 1} "
+            f"(e.g., 4 for Breakout, 18 for Centipede)."
+        )
 
     model = models.ContrastiveSWM(
         embedding_dim=args.embedding_dim,
@@ -130,13 +139,12 @@ def main():
 
         for batch_idx, data_batch in enumerate(train_loader):
             data_batch = [tensor.to(device) for tensor in data_batch]
+            obs, action, next_obs = data_batch
 
             optimizer.zero_grad()
 
             if args.decoder:
-
                 optimizer_dec.zero_grad()
-                obs, action, next_obs = data_batch
 
                 objs = model.obj_extractor(obs)
                 state = model.obj_encoder(objs)
@@ -149,13 +157,28 @@ def main():
                 next_loss = F.binary_cross_entropy(next_rec, next_obs, reduction='sum') / obs.size(0)
                 loss += next_loss
             else:
-                loss = model.contrastive_loss(*data_batch)
+                loss = model.contrastive_loss(obs, action, next_obs)
 
             loss.backward()
             optimizer.step()
 
             if args.decoder:
                 optimizer_dec.step()
+
+            # Save the latent dynamics of the first batch for downstream physics analysis
+            if batch_idx == 0:
+                with torch.no_grad():
+                    objs = model.obj_extractor(obs)
+                    state = model.obj_encoder(objs)
+                    next_state_pred = state + model.transition_model(state, action)
+
+                latent_data = {
+                    'obs': obs.detach().cpu(),
+                    'action': action.detach().cpu(),
+                    'state': state.detach().cpu(),
+                    'next_state_pred': next_state_pred.detach().cpu()
+                }
+                torch.save(latent_data, os.path.join(save_folder, f'latents_epoch_{epoch}.pt'))
 
             batch_loss = loss.item()
             total_epoch_loss += batch_loss
@@ -170,12 +193,10 @@ def main():
         avg_loss = total_epoch_loss / len(train_loader)
         logging.info(f"====> Epoch: {epoch:3d} | Average Loss: {avg_loss:.6f}")
 
-        if avg_loss < best_loss:
-            best_loss = avg_loss
+        if epoch % 10 == 0 or epoch == args.epochs:
             torch.save(model.state_dict(), model_file)
             if args.decoder and decoder is not None:
                 torch.save(decoder.state_dict(), os.path.join(save_folder, 'decoder.pt'))
-            logging.info(f"--> Saved new best checkpoint (Loss: {best_loss:.6f}) to {model_file}")
 
 if __name__ == '__main__':
     main()
