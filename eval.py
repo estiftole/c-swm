@@ -102,6 +102,7 @@ bce_loss_sum = 0.0
 pred_states = []
 next_states = []
 
+print('Running eval on {} steps'.format(args.num_steps))
 with torch.no_grad():
     for batch_idx, data_batch in enumerate(eval_loader):
         data_batch = [[t.to(device) for t in tensor] for tensor in data_batch]
