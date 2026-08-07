@@ -50,6 +50,16 @@ dataset = utils.PathDataset(
 eval_loader = data.DataLoader(
     dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
+obs_batch, action_batch = next(iter(eval_loader))
+input_shape = obs_batch[0][0].size()
+max_action_in_batch = int(action_batch[0].max().item())
+
+if max_action_in_batch >= args.action_dim:
+    raise ValueError(
+        f"CRITICAL: Eval dataset contains action index {max_action_in_batch}, "
+        f"but loaded model --action-dim is only {args.action_dim}."
+    )
+
 obs = next(iter(eval_loader))[0]
 input_shape = obs[0][0].size()
 
@@ -114,6 +124,15 @@ with torch.no_grad():
         if decoder is not None:
             pred_rec = torch.sigmoid(decoder(pred_state))
             bce_loss_sum += F.binary_cross_entropy(pred_rec, next_obs, reduction='sum').item()
+
+            if batch_idx == 0:
+                rollout_data = {
+                    'initial_obs': obs.cpu(),
+                    'true_final_obs': next_obs.cpu(),
+                    'pred_final_obs': pred_rec.cpu(),
+                    'num_steps': args_eval.num_steps
+                }
+                torch.save(rollout_data, os.path.join(args_eval.save_folder, f'rollout_{args_eval.num_steps}steps.pt'))
 
         pred_states.append(pred_state.cpu())
         next_states.append(next_state.cpu())
