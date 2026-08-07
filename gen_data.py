@@ -42,16 +42,17 @@ def crop_normalize(img, crop_ratio):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('--env_id', type=str, default='ShapesTrain-v0',
+    _ = parser.add_argument('--env_id', type=str, default='ShapesTrain-v0',
                         help='Select the environment to run.')
-    parser.add_argument('--fname', type=str, default='data/shapes_train.h5',
+    _ = parser.add_argument('--fname', type=str, default='data/shapes_train.h5',
                         help='Save path for replay buffer.')
-    parser.add_argument('--num_episodes', type=int, default=1000,
+    _ = parser.add_argument('--num_episodes', type=int, default=1000,
                         help='Total number of episodes to simulate.')
-    parser.add_argument('--atari', action='store_true', default=False,
+    _ = parser.add_argument('--atari', action='store_true', default=False,
                         help='Run atari mode (stack multiple frames).')
-    parser.add_argument('--seed', type=int, default=1,
+    _ = parser.add_argument('--seed', type=int, default=1,
                         help='Random seed.')
+    _ = parser.add_argument('--max-steps', type=int, default=11, help='Max steps per episode.')
     args = parser.parse_args()
 
     crop = None
@@ -64,6 +65,13 @@ if __name__ == '__main__':
     elif 'spaceinvaders' in env_id_lower:
         crop = (30, 200)
         warmstart = 50
+    elif 'breakout' in env_id_lower:
+        # Removes the top score UI and captures the 160x160 physics area
+        crop = (34, 194)
+        warmstart = 90
+    elif 'centipede' in env_id_lower:
+        crop = (25, 182)
+        warmstart = 60
     elif args.atari:
         crop = (0, 210)
         warmstart = 0
@@ -74,7 +82,7 @@ if __name__ == '__main__':
 
     kwargs = {}
     if args.atari and warmstart is not None:
-        kwargs['max_episode_steps'] = warmstart + 11
+        kwargs['max_episode_steps'] = warmstart + args.max_steps
 
 
     env = gym.make(args.env_id, **kwargs)
