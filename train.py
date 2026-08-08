@@ -22,7 +22,7 @@ parser.add_argument('--epochs', type=int, default=100,
 parser.add_argument('--learning-rate', type=float, default=5e-4,
                     help='Learning rate.')
 
-parser.add_argument('--encoder', type=str, default='small',
+parser.add_argument('--encoder', type=str, default='medium',
                     help='Object extrator CNN size (e.g., `small`).')
 parser.add_argument('--sigma', type=float, default=0.5,
                     help='Energy scale.')
