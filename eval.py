@@ -127,16 +127,14 @@ with torch.no_grad():
     indices = np.stack(indices, axis=0)
     indices = torch.from_numpy(indices).long()
 
-    print('Processed {} batches of size {}'.format(
-        batch_idx + 1, args.batch_size))
+    print(f'Processed {batch_idx + 1} batches of size {args.batch_size}')
 
     labels = torch.zeros(
         indices.size(0), device=indices.device,
         dtype=torch.int64).unsqueeze(-1)
 
     num_samples += full_size
-    print('Size of current topk evaluation batch: {}'.format(
-        full_size))
+    print(f'Size of current topk evaluation batch: {full_size}')
 
     for k in topk:
         match = indices[:, :k] == labels
@@ -153,6 +151,6 @@ with torch.no_grad():
     next_states = []
 
 for k in topk:
-    print('Hits @ {}: {}'.format(k, hits_at[k] / float(num_samples)))
+    print(f'Hits @ {k}: {hits_at[k] / float(num_samples)}')
 
-print('MRR: {}'.format(rr_sum / float(num_samples)))
+print(f'MRR: {rr_sum / float(num_samples)}')
