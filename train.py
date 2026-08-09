@@ -184,16 +184,17 @@ for epoch in range(1, args.epochs + 1):
         if args.decoder:
             optimizer_dec.step()
 
-        if epoch % args.log_interval == 0:
-            print(
-                f'Epoch: {epoch} [{batch_idx * len(data_batch[0])}/{len(train_loader.dataset)} '
-                f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item() / len(data_batch[0]):.6f}'
-            )
+        # if epoch % args.log_interval == 0:
+            # print(
+            #     f'Epoch: {epoch} [{batch_idx * len(data_batch[0])}/{len(train_loader.dataset)} '
+            #     f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item() / len(data_batch[0]):.6f}'
+            # )
 
         step += 1
 
     avg_loss = train_loss / len(train_loader.dataset)
-    print(f'====> Epoch: {epoch} Average loss: {avg_loss:.6f}')
+    if epoch % args.log_interval == 0:
+        print(f'====> Epoch: {epoch} Average loss: {avg_loss:.6f}')
 
     if avg_loss < best_loss:
         best_loss = avg_loss
