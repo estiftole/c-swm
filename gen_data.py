@@ -151,7 +151,7 @@ if __name__ == '__main__':
                 if done:
                     break
 
-        if i % 10 == 0:
+        if i % 100 == 0:
             print(f"iter {i}")
 
     env.close()
