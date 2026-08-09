@@ -49,7 +49,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disable CUDA training.')
 parser.add_argument('--seed', type=int, default=42,
                     help='Random seed (default: 42).')
-parser.add_argument('--log-interval', type=int, default=100,
+parser.add_argument('--log-interval', type=int, default=10,
                     help='How many batches to wait before logging'
                          'training status.')
 parser.add_argument('--dataset', type=str,
@@ -184,7 +184,7 @@ for epoch in range(1, args.epochs + 1):
         if args.decoder:
             optimizer_dec.step()
 
-        if batch_idx % args.log_interval == 0:
+        if epoch % args.log_interval == 0:
             print(
                 f'Epoch: {epoch} [{batch_idx * len(data_batch[0])}/{len(train_loader.dataset)} '
                 f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item() / len(data_batch[0]):.6f}'
