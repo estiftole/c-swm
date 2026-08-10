@@ -31,7 +31,7 @@ meta_file = os.path.join(args_eval.save_folder, 'metadata.pkl')
 model_file = os.path.join(args_eval.save_folder, 'model.pt')
 
 args = pickle.load(open(meta_file, 'rb'))['args']
-
+model_seed = args.seed
 args.cuda = not args_eval.no_cuda and torch.cuda.is_available()
 args.batch_size = 100
 args.dataset = args_eval.dataset
@@ -154,7 +154,7 @@ with torch.no_grad():
 
 eval_info = {
     "model_name": args.name,
-    "seed": args.seed,
+    "seed": model_seed,
     "decoder": args.decoder,
     "num_steps": args_eval.num_steps,
     "hits_at_1": hits_at[1] / float(num_samples),
