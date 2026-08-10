@@ -64,7 +64,7 @@ model = models.ContrastiveSWM(
     # encoder=args.encoder
 ).to(device)
 
-print(f'Running eval on {args_eval.num_steps} steps...')
+# print(f'Running eval on {args_eval.num_steps} steps...')
 
 
 model.load_state_dict(torch.load(model_file))
@@ -127,14 +127,14 @@ with torch.no_grad():
     indices = np.stack(indices, axis=0)
     indices = torch.from_numpy(indices).long()
 
-    print(f'Processed {batch_idx + 1} batches of size {args.batch_size}')
+    # print(f'Processed {batch_idx + 1} batches of size {args.batch_size}')
 
     labels = torch.zeros(
         indices.size(0), device=indices.device,
         dtype=torch.int64).unsqueeze(-1)
 
     num_samples += full_size
-    print(f'Size of current topk evaluation batch: {full_size}')
+    # print(f'Size of current topk evaluation batch: {full_size}')
 
     for k in topk:
         match = indices[:, :k] == labels
