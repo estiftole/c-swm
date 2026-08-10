@@ -150,7 +150,7 @@ with torch.no_grad():
     pred_states = []
     next_states = []
 
-print(f"decoder: {args.decoder},\nresults: {{num_steps: {args_eval.num_steps},")
+print(f"decoder: {args.decoder},\nnum_steps: {args_eval.num_steps},\nresults: {{")
 for k in topk:
     print(f'hits_at_{k}: {hits_at[k] / float(num_samples)},')
 
