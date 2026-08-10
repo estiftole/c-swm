@@ -159,7 +159,7 @@ eval_info = {
     "num_steps": args_eval.num_steps,
     "results": {
         "hits_at_1": hits_at[1] / float(num_samples),
-        "mrr": rr_sum / float(num_samples),
+        "mrr": rr_sum.item() / float(num_samples),
     }
 }
 
