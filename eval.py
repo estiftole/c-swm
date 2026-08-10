@@ -1,3 +1,4 @@
+import json
 import argparse
 import torch
 import utils
@@ -150,8 +151,19 @@ with torch.no_grad():
     pred_states = []
     next_states = []
 
-print(f"decoder: {args.decoder},\nnum_steps: {args_eval.num_steps},\nresults: {{", end="")
-for k in topk:
-    print(f'hits_at_{k}: {hits_at[k] / float(num_samples)},', end=" ")
 
-print(f'mrr: {rr_sum / float(num_samples)}}}}}')
+eval_info = {
+    "model_name": args.name,
+    "seed": args.seed,
+    "decoder": args.decoder,
+    "num_steps": args_eval.num_steps,
+    "results": {
+        "hits_at_1": hits_at[1] / float(num_samples),
+        "mrr": rr_sum / float(num_samples),
+    }
+}
+
+print(eval_info)
+
+with open("results.jsonl", "a") as f:
+    f.write(json.dumps(eval_info) + "\n")
