@@ -9,7 +9,7 @@ C-SWMs can learn object-factored state representations and state transition mode
 
 ### Setup 
 
-```
+```bash
 # Clone repo
 git clone -b scratch https://github.com/estiftole/c-swm.git
 cd c-swm
