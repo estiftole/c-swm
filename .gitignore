@@ -15,3 +15,4 @@ dist/
 
 # Other files
 sketch.py
+results.jsonl
