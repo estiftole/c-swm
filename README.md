@@ -9,7 +9,7 @@ C-SWMs can learn object-factored state representations and state transition mode
 
 ### Setup 
 
-```
+```bash
 # Clone repo
 git clone -b scratch https://github.com/estiftole/c-swm.git
 cd c-swm
@@ -41,9 +41,9 @@ uv run gen_data.py --env_id ALE/Breakout-v5 --fname data/breakout_eval.h5 --num_
 Centipede
 ```bash
 # Generate centipede training and eval data
-!uv run gen_data.py --env_id ALE/Centipede-v5 --fname data/centipede_train.h5 --num_episodes {num_train_episodes} --atari --seed 1
+uv run gen_data.py --env_id ALE/Centipede-v5 --fname data/centipede_train.h5 --num_episodes {num_train_episodes} --atari --seed 1
 
-!uv run gen_data.py --env_id ALE/Centipede-v5 --fname data/centipede_eval.h5 --num_episodes {num_eval_episodes} --atari --seed 2
+uv run gen_data.py --env_id ALE/Centipede-v5 --fname data/centipede_eval.h5 --num_episodes {num_eval_episodes} --atari --seed 2
 ```
 
 ### Train
